@@ -3,6 +3,7 @@
  *
  * Copyright 2007-2008 by OpenMoko, Inc.
  * Copyright 2013-2014 Hans Petter Selasky <hps@bitfrost.no>
+ * Copyright 2016 Intel Corporation.
  *
  * Written by Harald Welte <laforge@openmoko.org>
  *
@@ -27,17 +28,29 @@
 #include <stdio.h>
 #include <string.h>
 #include <getopt.h>
+
+#ifndef USE_QDA
 #include <libusb.h>
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 
 #include "portable.h"
+#ifdef USE_QDA
+#include "qda.h"
+#include "serial_io.h"
+#include "dfu_util_qda.h"
+#else
 #include "dfu.h"
+#endif
 #include "usb_dfu.h"
 #include "dfu_file.h"
 #include "dfu_load.h"
+#ifndef USE_QDA
 #include "dfu_util.h"
 #include "dfuse.h"
+#endif
 #include "quirks.h"
 
 #ifdef HAVE_USBPATH_H
@@ -170,6 +183,56 @@ static int resolve_device_path(char *path)
 
 #endif /* !HAVE_USBPATH_H */
 
+#ifdef USE_QDA
+static void help(void)
+{
+    fprintf(stderr,
+	    "Usage: dfu-util-qda [options] ...\n"
+	    "  -h --help\t\t\tPrint this help message\n"
+	    "  -V --version\t\t\tPrint the version number\n"
+	    "  -v --verbose\t\t\tPrint verbose debug statements\n");
+    fprintf(stderr,
+	    "  -p --path <to serial device>\tSpecify path to UART\n"
+	    "  -s --speed <baud rate>\tSpecify UART baud rate [default: 115200]\n"
+	    "  -t --transfer-size <size>\tOverride DFU transfer block size.\n"
+	    "  -a --alt <alt>\t\tSpecify the Altsetting of the DFU Interface\n"
+	    "\t\t\t\tby name or by number\n");
+    fprintf(stderr,
+	    "  -U --upload <file>\t\tRead firmware from device into <file>\n"
+	    "  -D --download <file>\t\tWrite firmware from <file> into device\n"
+	    "  -R --reset\t\t\tReset device once we're finished\n");
+	exit(EX_USAGE);
+}
+
+static void print_version(void)
+{
+	printf(PACKAGE_STRING "\n\n");
+	printf("Copyright 2005-2009 Weston Schmidt, Harald Welte and OpenMoko Inc.\n"
+	       "Copyright 2010-2014 Tormod Volden and Stefan Schmidt\n"
+	       "Copyright 2016 Intel Corporation.\n"
+	       "This program is Free Software and has ABSOLUTELY NO WARRANTY\n\n");
+}
+
+static struct option opts[] = {
+	{ "help", 0, 0, 'h' },
+	{ "version", 0, 0, 'V' },
+	{ "verbose", 0, 0, 'v' },
+	{ "list", 0, 0, 'l' },
+	{ "path", 1, 0, 'p' },
+	{ "altsetting", 1, 0, 'a' },
+	{ "alt", 1, 0, 'a' },
+	{ "transfer-size", 1, 0, 't' },
+	{ "upload", 1, 0, 'U' },
+	{ "download", 1, 0, 'D' },
+	{ "reset", 0, 0, 'R' },
+	{ "speed", 1, 0, 's'},
+	{ 0, 0, 0, 0 }
+};
+
+const char * short_opts = "hVvp:a:t:U:D:Rs:";
+
+#else /* USE_QDA */
+
 static void help(void)
 {
 	fprintf(stderr, "Usage: dfu-util [options] ...\n"
@@ -234,13 +297,22 @@ static struct option opts[] = {
 	{ 0, 0, 0, 0 }
 };
 
+const char * short_opts = "hVvleE:d:p:c:i:a:S:t:U:D:Rs:Z:";
+
+#endif /* USE_QDA */
+
 int main(int argc, char **argv)
 {
 	int expected_size = 0;
 	unsigned int transfer_size = 0;
 	enum mode mode = MODE_NONE;
 	struct dfu_status status;
+#ifdef USE_QDA
+	unsigned int transfer_speed = 115200;
+	char * serial_device_path = NULL;
+#else
 	libusb_context *ctx;
+#endif
 	struct dfu_file file;
 	char *end;
 	int final_reset = 0;
@@ -259,8 +331,7 @@ int main(int argc, char **argv)
 
 	while (1) {
 		int c, option_index = 0;
-		c = getopt_long(argc, argv, "hVvleE:d:p:c:i:a:S:t:U:D:Rs:Z:", opts,
-				&option_index);
+		c = getopt_long(argc, argv, short_opts, opts, &option_index);
 		if (c == -1)
 			break;
 
@@ -289,16 +360,24 @@ int main(int argc, char **argv)
 			parse_vendprod(optarg);
 			break;
 		case 'p':
+#ifdef USE_QDA
+			serial_device_path = optarg;
+#else
 			/* Parse device path */
 			ret = resolve_device_path(optarg);
 			if (ret < 0)
 				errx(EX_SOFTWARE, "Unable to parse '%s'", optarg);
 			if (!ret)
 				errx(EX_SOFTWARE, "Cannot find '%s'", optarg);
+#endif
 			break;
 		case 'c':
 			/* Configuration */
+#ifdef USE_QDA
+			serial_device_path = optarg;
+#else
 			match_config_index = atoi(optarg);
+#endif
 			break;
 		case 'i':
 			/* Interface */
@@ -333,7 +412,11 @@ int main(int argc, char **argv)
 			final_reset = 1;
 			break;
 		case 's':
+#ifdef USE_QDA
+			transfer_speed = atoi(optarg);
+#else
 			dfuse_options = optarg;
+#endif
 			break;
 		default:
 			help();
@@ -370,6 +453,39 @@ int main(int argc, char **argv)
 		}
 	}
 
+#ifdef USE_QDA
+	qda_if_t root;
+	dfu_root = (struct dfu_if *)&root;
+	dfu_root->altsetting = match_iface_alt_index;
+
+	qda_conf_t qda_conf;
+	qda_conf.send = dfu_util_qda_send;
+	qda_conf.receive = dfu_util_qda_receive;
+	qda_conf.detach = serial_detach;
+	qda_init(&qda_conf);
+
+	/* open interface */
+	ret = serial_io_open(serial_device_path,
+						 transfer_speed);
+
+	if (ret < 0) {
+		errx(EX_IOERR, "Unable open serial device.");
+	}
+
+	printf("Detaching device into DFU mode.\n");
+	if (qda_dfu_detach() < 0) {
+		errx(EX_IOERR, "can't detach device.");
+	}
+
+
+	printf("Determining device capabilities.\n");
+	if (qda_get_dfu_desc(dfu_root) < 0) {
+		errx(EX_IOERR, "can't read device capabilities.");
+	}
+
+	runtime_vendor = dfu_root->vendor;
+	runtime_product = dfu_root->product;
+#else
 	ret = libusb_init(&ctx);
 	if (ret)
 		errx(EX_IOERR, "unable to initialize libusb: %i", ret);
@@ -537,6 +653,7 @@ dfustate:
 	if (libusb_claim_interface(dfu_root->dev_handle, dfu_root->interface) < 0) {
 		errx(EX_IOERR, "Cannot claim interface");
 	}
+#endif /* USE_QDA */
 
 	printf("Setting Alternate Setting #%d ...\n", dfu_root->altsetting);
 	if (libusb_set_interface_alt_setting(dfu_root->dev_handle, dfu_root->interface, dfu_root->altsetting) < 0) {
@@ -580,6 +697,7 @@ status_again:
 		break;
 	}
 
+	/* TODO: change "USB" string in QDA mode */
 	if (DFU_STATUS_OK != status.bStatus ) {
 		printf("WARNING: DFU Status: '%s'\n",
 			dfu_status_to_string(status.bStatus));
@@ -636,8 +754,10 @@ status_again:
 			err(EX_IOERR, "Cannot open file %s for writing", file.name);
 
 		if (dfuse_device || dfuse_options) {
+#ifndef USE_QDA
 		    if (dfuse_do_upload(dfu_root, transfer_size, fd,
 					dfuse_options) < 0)
+#endif
 			exit(1);
 		} else {
 		    if (dfuload_do_upload(dfu_root, transfer_size,
@@ -660,8 +780,10 @@ status_again:
 				dfu_root->vendor, dfu_root->product);
 		}
 		if (dfuse_device || dfuse_options || file.bcdDFU == 0x11a) {
+#ifndef USE_QDA
 		        if (dfuse_do_dnload(dfu_root, transfer_size, &file,
 							dfuse_options) < 0)
+#endif
 				exit(1);
 		} else {
 			if (dfuload_do_dnload(dfu_root, transfer_size, &file) < 0)
@@ -679,21 +801,29 @@ status_again:
 	}
 
 	if (final_reset) {
+#ifdef USE_QDA
+		printf("Resetting device to switch back to runtime mode\n");
+#else
 		if (dfu_detach(dfu_root->dev_handle, dfu_root->interface, 1000) < 0) {
 			/* Even if detach failed, just carry on to leave the
                            device in a known state */
 			warnx("can't detach");
 		}
 		printf("Resetting USB to switch back to runtime mode\n");
+#endif
 		ret = libusb_reset_device(dfu_root->dev_handle);
 		if (ret < 0 && ret != LIBUSB_ERROR_NOT_FOUND) {
 			errx(EX_IOERR, "error resetting after download");
 		}
 	}
 
+#ifdef USE_QDA
+	serial_io_close();
+#else
 	libusb_close(dfu_root->dev_handle);
 	dfu_root->dev_handle = NULL;
 	libusb_exit(ctx);
+#endif
 
 	return (0);
 }

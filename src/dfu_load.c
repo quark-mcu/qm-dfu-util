@@ -10,6 +10,7 @@
  * Copyright 2007-2008 Harald Welte <laforge@gnumonks.org>
  * Copyright 2013 Hans Petter Selasky <hps@bitfrost.no>
  * Copyright 2014 Tormod Volden <debian.tormod@gmail.com>
+ * Copyright 2016 Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,10 +32,18 @@
 #include <errno.h>
 #include <string.h>
 
+#ifndef USE_QDA
 #include <libusb.h>
+#endif
 
 #include "portable.h"
+
+#ifdef USE_QDA
+#include "qda.h"
+#else
 #include "dfu.h"
+#endif
+
 #include "usb_dfu.h"
 #include "dfu_file.h"
 #include "dfu_load.h"
