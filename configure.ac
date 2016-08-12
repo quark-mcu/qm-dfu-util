@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([dfu-util-qda],[1.1.0 beta (dfu-util 0.8)],,,])
+AC_INIT([dfu-util-qda],[1.1.0 (dfu-util 0.8)],,,])
 AC_CONFIG_AUX_DIR(m4)
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_HEADERS([config.h])
