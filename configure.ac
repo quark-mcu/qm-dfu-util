@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([dfu-util-qda],[1.1.0 (dfu-util 0.8)],,,])
+AC_INIT([dfu-util-qda],[1.2.0 (dfu-util 0.8)],,,])
 AC_CONFIG_AUX_DIR(m4)
 AM_INIT_AUTOMAKE([foreign])
 AC_CONFIG_HEADERS([config.h])
@@ -20,6 +20,10 @@ CFLAGS="$CFLAGS"
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([usbpath.h windows.h sysexits.h])
+
+# Check if it's a Windows system
+AC_CHECK_HEADER([windows.h], [windows_build=yes])
+AM_CONDITIONAL([WINDOWS_BUILD], [test "x$windows_build" = "xyes"])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
