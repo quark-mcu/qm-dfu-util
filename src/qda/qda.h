@@ -1,16 +1,16 @@
 /*
  * Quark Microcontroller DFU Utility
  * Copyright (C) 2016, Intel Corporation
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License version 2 only, as published by
  * the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 51
  * Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -216,7 +216,15 @@ int qda_dfu_getstate();
  */
 int qda_dfu_abort();
 
-/* Not implemented */
+/**
+ * Retrieve state string.
+ *
+ * Return state string of a valid DFU state.
+ *
+ * @param[in] state The DFU state number.
+ *
+ * @return String of the requested state number.
+ */
 const char *qda_dfu_state_to_string(int state);
 
 /**
@@ -232,10 +240,15 @@ const char *qda_dfu_status_to_string(int status);
 
 /* DFU SHIM */
 #define dfu_detach(dev, interface, timeout) qda_dfu_detach()
+/*
+ * In the following two macros we use the 'comma' operator and we cast
+ * 'interface' to void to mark it as used and avoid compilation warnings about
+ * unused variables.
+ */
 #define dfu_download(dev, interface, len, trans, data)                         \
-	qda_dfu_download(len, trans, data)
+	((void)interface, qda_dfu_download(len, trans, data))
 #define dfu_upload(dev, interface, len, trans, data)                           \
-	qda_dfu_upload(len, trans, data)
+	((void)interface, qda_dfu_upload(len, trans, data))
 
 #define dfu_get_status(dif, status) qda_dfu_getstatus(status)
 #define dfu_clear_status(dev, interface) qda_dfu_getstate()

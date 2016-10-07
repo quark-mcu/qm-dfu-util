@@ -1,16 +1,16 @@
 /*
  * Quark Microcontroller DFU Utility
  * Copyright (C) 2016, Intel Corporation
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License version 2 only, as published by
  * the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 51
  * Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "qda.h"
+#include "usb_dfu.h"
 
 /* For x86 hosts we do not have to do any conversion */
 #define htoq32(val) (val)
@@ -162,8 +163,7 @@ int qda_dfu_detach(void)
 {
 	printd("qda_dfu_detach...\t");
 
-	if (qda_conf->detach() < 0)
-	{
+	if (qda_conf->detach() < 0) {
 		printd("[FAIL]\n");
 		return -1;
 	}
@@ -323,6 +323,7 @@ int qda_dfu_abort()
 }
 
 /* The following dfu_status functions are copied from dfu.c */
+/* TODO: consider reusing the existing functions from dfu.c */
 
 /* Chapter 6.1.2 */
 static const char *dfu_status_names[] = {
@@ -361,11 +362,36 @@ static const char *dfu_status_names[] = {
 	/* DFU_STATUS_errSTALLEDPKT */
 	"Device stalled an unexpected request"};
 
+static const char *dfu_state_names[] = {
+	/* DFU_STATE_appIDLE */
+	"appIDLE",
+	/* DFU_STATE_appDETACH */
+	"appDETACH",
+	/* DFU_STATE_dfuIDLE */
+	"dfuIDLE",
+	/* DFU_STATE_dfuDNLOAD_SYNC */
+	"dfuDNLOAD-SYNC",
+	/* DFU_STATE_dfuDNBUSY */
+	"dfuDNBUSY",
+	/* DFU_STATE_dfuDNLOAD_IDLE */
+	"dfuDNLOAD-IDLE",
+	/* DFU_STATE_dfuMANIFEST_SYNC */
+	"dfuMANIFEST-SYNC",
+	/* DFU_STATE_dfuMANIFEST */
+	"dfuMANIFEST",
+	/* DFU_STATE_dfuMANIFEST_WAIT_RST */
+	"dfuMANIFEST-WAIT-RESET",
+	/* DFU_STATE_dfuUPLOAD_IDLE */
+	"dfuUPLOAD-IDLE",
+	/* DFU_STATE_dfuERROR */
+	"dfuERROR",
+};
+
 const char *qda_dfu_state_to_string(int state)
 {
-	const char *message;
-	message = "State to string: N/A";
-	return message;
+	if (state > DFU_STATE_dfuERROR)
+		return "INVALID STATE ID";
+	return dfu_state_names[state];
 }
 
 const char *qda_dfu_status_to_string(int status)

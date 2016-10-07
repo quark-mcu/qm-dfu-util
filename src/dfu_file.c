@@ -142,8 +142,13 @@ void dfu_progress_bar(const char *desc, unsigned long long curr,
 	}
 	buf[x] = 0;
 
+#ifdef HAVE_WINDOWS_H
+	printf("\r%s\t[%s] %3I64d%% %12I64d bytes", desc, buf,
+	    (100ULL * curr) / max, curr);
+#else
 	printf("\r%s\t[%s] %3lld%% %12lld bytes", desc, buf,
 	    (100ULL * curr) / max, curr);
+#endif
 
 	if (progress == PROGRESS_BAR_WIDTH)
 		printf("\n%s done.\n", desc);

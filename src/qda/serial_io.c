@@ -1,16 +1,16 @@
 /*
  * Quark Microcontroller DFU Utility
  * Copyright (C) 2016, Intel Corporation
- * 
+ *
  * This program is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License version 2 only, as published by
  * the Free Software Foundation.
- * 
+ *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
  * details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with
  * this program; if not, write to the Free Software Foundation, Inc., 51
  * Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -52,7 +52,7 @@ void xmodem_putc(uint8_t *ch)
  * 		  is not modified.
  *
  * @return 0 on success, negative error code otherwise.
- * @retval -ETIME in case of timeout.
+ * @retval -ETIMEDOUT in case of timeout.
  * @retval -EIO   in case of I/O error.
  */
 int xmodem_getc(uint8_t *ch)
@@ -67,7 +67,7 @@ int xmodem_getc(uint8_t *ch)
 			return 0;
 		case 0:
 			/* We read 0 characters: we timed out */
-			return -ETIME;
+			return -ETIMEDOUT;
 		default:
 			/* Error or unexpected value: generic I/O error */
 			return -EIO;
@@ -98,11 +98,19 @@ int serial_io_open(char *path, int speed)
 	/* Set 3s as a standart value. Will be set by xmodem_set_timeout before
 	 * each run. */
 	tio.c_cc[VTIME] = 30;
-	serial_handle = open(path, O_RDWR);
 
+	serial_handle = open(path, O_RDWR | O_NOCTTY);
+
+	/* Check if file is open */
 	if (serial_handle == -1) {
 		return -1;
 	}
+
+	/* Check if file is a terminal */
+	if (isatty(serial_handle) != 1) {
+		return -1;
+	}
+
 	/* Save initial system settings */
 	if(tcgetattr(serial_handle, &tio_initial)) {
 		return -1;

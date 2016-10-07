@@ -174,6 +174,7 @@ static int resolve_device_path(char *path)
 }
 
 #else /* HAVE_USBPATH_H */
+#ifndef USE_QDA
 
 static int resolve_device_path(char *path)
 {
@@ -181,6 +182,7 @@ static int resolve_device_path(char *path)
 	errx(EX_SOFTWARE, "USB device paths are not supported by this dfu-util.\n");
 }
 
+#endif /* !USE_QDA */
 #endif /* !HAVE_USBPATH_H */
 
 #ifdef USE_QDA
@@ -320,7 +322,9 @@ int main(int argc, char **argv)
 	int dfuse_device = 0;
 	int fd;
 	const char *dfuse_options = NULL;
+#ifndef USE_QDA
 	int detach_delay = 5;
+#endif
 	uint16_t runtime_vendor;
 	uint16_t runtime_product;
 
@@ -353,9 +357,11 @@ int main(int argc, char **argv)
 			match_iface_alt_index = 0;
 			match_iface_index = 0;
 			break;
+#ifndef USE_QDA
 		case 'E':
 			detach_delay = atoi(optarg);
 			break;
+#endif
 		case 'd':
 			parse_vendprod(optarg);
 			break;
@@ -469,7 +475,7 @@ int main(int argc, char **argv)
 						 transfer_speed);
 
 	if (ret < 0) {
-		errx(EX_IOERR, "Unable open serial device.");
+		errx(EX_IOERR, "Cannot open serial device.");
 	}
 
 	printf("Detaching device into DFU mode.\n");
