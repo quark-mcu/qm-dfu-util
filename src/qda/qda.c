@@ -38,6 +38,13 @@
 #define printd(...)
 #endif
 
+#define FAIL_IF(statement) do { \
+		if(statement) { \
+			printd("[FAIL]\n"); \
+			return -1; \
+		} \
+	} while(0) \
+
 qda_conf_t *qda_conf;
 
 /* NOTE: make the size of the payload dynamic */
@@ -52,19 +59,19 @@ int qda_init(qda_conf_t *conf)
 int qda_reset()
 {
 	printd("qda_reset...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_RESET);
 
-	qda_conf->send((uint8_t *)req, sizeof(req->type));
-	qda_conf->receive(qda_buf, sizeof(qda_buf));
+	rc = qda_conf->send((uint8_t *)req, sizeof(req->type));
+	FAIL_IF(rc < 0);
+	rc = qda_conf->receive(qda_buf, sizeof(qda_buf));
+	FAIL_IF(rc >= (int) sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_ACK)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_ACK));
 	printd("[DONE]\n");
 	return 0;
 }
@@ -72,20 +79,19 @@ int qda_reset()
 int qda_get_dev_desc(qda_if_t *dif)
 {
 	printd("qda_get_dev_desc...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	dev_desc_resp_payload_t *pl;
 
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_DEV_DESC_REQ);
 
-	qda_conf->send((uint8_t *)req, sizeof(req->type));
+	rc = qda_conf->send((uint8_t *)req, sizeof(req->type));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_DEV_DESC_RESP)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_DEV_DESC_RESP));
 	pl = (dev_desc_resp_payload_t *)resp->payload;
 
 	dif->product = qtoh16(pl->id_product);
@@ -103,20 +109,19 @@ int qda_get_dev_desc(qda_if_t *dif)
 int qda_get_dfu_desc(qda_if_t *dif)
 {
 	printd("qda_get_dfu_desc...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	dfu_desc_resp_payload_t *pl;
 
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_DFU_DESC_REQ);
 
-	qda_conf->send((uint8_t *)req, sizeof(req->type));
+	rc = qda_conf->send((uint8_t *)req, sizeof(req->type));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_DFU_DESC_RESP)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_DFU_DESC_RESP));
 	pl = (dfu_desc_resp_payload_t *)resp->payload;
 
 	/* TODO: save alt setting number, attributes and timeout
@@ -137,6 +142,7 @@ int qda_get_dfu_desc(qda_if_t *dif)
 int qda_set_alt_setting(uint8_t alt)
 {
 	printd("qda_set_dfu_alt_setting...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	set_alt_setting_payload_t *pl;
 
@@ -145,16 +151,12 @@ int qda_set_alt_setting(uint8_t alt)
 	pl = (set_alt_setting_payload_t *)req->payload;
 	pl->alt_setting = alt;
 
-	qda_conf->send((uint8_t *)req, sizeof(req->type) + sizeof(*pl));
+	rc = qda_conf->send((uint8_t *)req, sizeof(req->type) + sizeof(*pl));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-
-	if (resp->type != htoq32(QDA_PKT_ACK)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
-
+	FAIL_IF(resp->type != htoq32(QDA_PKT_ACK));
 	printd("[DONE]\n");
 	return 0;
 }
@@ -162,12 +164,7 @@ int qda_set_alt_setting(uint8_t alt)
 int qda_dfu_detach(void)
 {
 	printd("qda_dfu_detach...\t");
-
-	if (qda_conf->detach() < 0) {
-		printd("[FAIL]\n");
-		return -1;
-	}
-
+	FAIL_IF(qda_conf->detach() < 0);
 	printd("[DONE]\n");
 	return 0;
 }
@@ -175,6 +172,7 @@ int qda_dfu_detach(void)
 int qda_dfu_download(uint16_t len, uint16_t transaction, const uint8_t *data)
 {
 	printd("qda_dfu_dnload (len=%d)\nstarting...\t\t", len);
+	int rc;
 	qda_pkt_t *req, *resp;
 	dnload_req_payload_t *pl;
 
@@ -188,14 +186,13 @@ int qda_dfu_download(uint16_t len, uint16_t transaction, const uint8_t *data)
 	}
 	memcpy(pl->data, data, len);
 
-	qda_conf->send((uint8_t *)req, sizeof(*req) + sizeof(*pl) + pl->data_len);
+	rc = qda_conf->send((uint8_t *)req,
+				sizeof(*req) + sizeof(*pl) + pl->data_len);
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_ACK)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_ACK));
 
 	printd("[DONE]\n");
 	return 0;
@@ -204,6 +201,7 @@ int qda_dfu_download(uint16_t len, uint16_t transaction, const uint8_t *data)
 int qda_dfu_upload(uint16_t len, uint16_t transaction, uint8_t *data)
 {
 	printd("qda_dfu_upload...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	upload_req_payload_t *pl_req;
 	upload_resp_payload_t *pl_resp;
@@ -215,19 +213,15 @@ int qda_dfu_upload(uint16_t len, uint16_t transaction, uint8_t *data)
 	pl_req->max_data_len = len;
 	pl_req->block_num = transaction;
 
-	qda_conf->send((uint8_t *)req, sizeof(*req) + sizeof(*pl_req));
+	rc = qda_conf->send((uint8_t *)req, sizeof(*req) + sizeof(*pl_req));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_DFU_UPLOAD_RESP)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_DFU_UPLOAD_RESP));
 	pl_resp = (upload_resp_payload_t *)resp->payload;
 	retv = qtoh16(pl_resp->data_len);
-	if (retv > len) {
-		return -1;
-	}
+	FAIL_IF(retv > len);
 	memcpy(data, pl_resp->data, retv);
 
 	printd("[DONE]\n");
@@ -238,19 +232,18 @@ int qda_dfu_upload(uint16_t len, uint16_t transaction, uint8_t *data)
 int qda_dfu_getstatus(dfu_status_t *status)
 {
 	printd("qda_dfu_getstatus...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	get_status_resp_payload_t *pl;
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_DFU_GETSTATUS_REQ);
 
-	qda_conf->send((uint8_t *)req, sizeof(*req));
+	rc = qda_conf->send((uint8_t *)req, sizeof(*req));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_DFU_GETSTATUS_RESP)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_DFU_GETSTATUS_RESP));
 	pl = (get_status_resp_payload_t *)resp->payload;
 	status->bState = pl->state;
 	status->bStatus = pl->status;
@@ -263,18 +256,17 @@ int qda_dfu_getstatus(dfu_status_t *status)
 int qda_dfu_clrstatus()
 {
 	printd("qda_dfu_clrstatus...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_DFU_CLRSTATUS);
 
-	qda_conf->send((uint8_t *)req, sizeof(*req));
+	rc = qda_conf->send((uint8_t *)req, sizeof(*req));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_ACK)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_ACK));
 
 	printd("[DONE]\n");
 	return 0;
@@ -283,19 +275,18 @@ int qda_dfu_clrstatus()
 int qda_dfu_getstate()
 {
 	printd("qda_dfu_getstate...\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	get_state_resp_payload_t *pl;
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_DFU_GETSTATE_REQ);
 
-	qda_conf->send((uint8_t *)req, sizeof(*req));
+	rc = qda_conf->send((uint8_t *)req, sizeof(*req));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_DFU_GETSTATE_RESP)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_DFU_GETSTATE_RESP));
 	pl = (get_state_resp_payload_t *)resp->payload;
 
 	printd("[DONE] (%s)\n", dfu_state_to_string(pl->state));
@@ -305,18 +296,17 @@ int qda_dfu_getstate()
 int qda_dfu_abort()
 {
 	printd("qda_dfu_abort...\t\t");
+	int rc;
 	qda_pkt_t *req, *resp;
 	req = (qda_pkt_t *)qda_buf;
 	req->type = htoq32(QDA_PKT_DFU_ABORT);
 
-	qda_conf->send((uint8_t *)req, sizeof(*req));
+	rc = qda_conf->send((uint8_t *)req, sizeof(*req));
+	FAIL_IF(rc < 0);
 	qda_conf->receive(qda_buf, sizeof(qda_buf));
 
 	resp = (qda_pkt_t *)qda_buf;
-	if (resp->type != htoq32(QDA_PKT_ACK)) {
-		printd("[FAIL]\n");
-		return -1;
-	}
+	FAIL_IF(resp->type != htoq32(QDA_PKT_ACK));
 
 	printd("[DONE]\n");
 	return 0;

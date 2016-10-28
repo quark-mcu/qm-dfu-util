@@ -23,8 +23,6 @@
 
 #include "xmodem.h"
 
-/* The maximum number of times XMODEM tries to send a packet / control byte */
-#define MAX_RETRANSMIT (8)
 /* The maximum number of consecutive RX errors XMODEM tolerates */
 #define MAX_RX_ERRORS (5)
 

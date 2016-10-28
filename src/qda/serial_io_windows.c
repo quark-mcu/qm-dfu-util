@@ -28,6 +28,10 @@
 #include <fcntl.h>
 #include "xmodem.h"
 
+/* Support for up to COM 999 */
+#define MAX_COM_PATH_LEN 11
+#define COM_PATH_ESPACE_PREFIX "\\\\.\\"
+
 static HANDLE serial_handle;
 static DCB serial_initial_params;
 
@@ -91,10 +95,26 @@ int xmodem_set_timeout(int ms)
 int serial_io_open(char *path, int speed)
 {
 	DCB serial_params = {0};
+	char escaped_path[MAX_COM_PATH_LEN];
+	int escaping_path_ret_v;
+
+	/*
+         * MS naming convention for opening COM ports can vary for below 9 and
+	 * above 9. However, the above 9 does also work for the below 9, so the
+	 * COMXYZ port is escaped to match that pattern: \\.\COMXYZ
+         */
+	escaping_path_ret_v = snprintf (escaped_path, MAX_COM_PATH_LEN, "%s%s",
+		COM_PATH_ESPACE_PREFIX, path);
+
+ 	/* Fail in case of error or input string too long */
+	if ((escaping_path_ret_v < 0) ||
+	   (escaping_path_ret_v >= MAX_COM_PATH_LEN)) {
+		return -1;
+	}
 
 	/* Open the serial port */
 	serial_handle = CreateFile(
-		path, GENERIC_READ|GENERIC_WRITE, 0, NULL,
+		escaped_path, GENERIC_READ|GENERIC_WRITE, 0, NULL,
 		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
 	if (serial_handle == INVALID_HANDLE_VALUE) {
