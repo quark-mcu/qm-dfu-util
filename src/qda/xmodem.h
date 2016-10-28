@@ -26,6 +26,9 @@
 /** XMODEM block size */
 #define XMODEM_BLOCK_SIZE (128)
 
+/* The maximum number of times XMODEM tries to send a packet / control byte */
+#define MAX_RETRANSMIT (3)
+
 /**
  * @defgroup groupXMODEM XMODEM
  * @{

@@ -1,5 +1,7 @@
-Known Issues and Workarounds
-****************************
+Fixed Issues
+************
+
+Issues fixed since version 1.3.0.
 
 =========== ====================================================================
 Issue       No support for COM ports >= COM10 on Windows
